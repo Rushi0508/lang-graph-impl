@@ -4,6 +4,7 @@ import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
 import dotenv from "dotenv";
+import readlineSync from "readline-sync";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ async function agent() {
 		const lastMessage = messages[messages.length - 1] as AIMessage;
 
 		if (lastMessage.tool_calls?.length) {
+			console.log("[LOG] Detected tool call. Routing to tools node.");
 			return "tools";
 		}
 
@@ -40,15 +42,21 @@ async function agent() {
 
 	const app = workflow.compile();
 
-	const finalState = await app.invoke({ messages: [new HumanMessage("when and where is the ipl final match 2025")] });
+	let messages: (HumanMessage | AIMessage)[] = [];
 
-	console.log(finalState.messages[finalState.messages.length - 1].content);
+	console.log("Welcome to the ReAct Agent. Type 'exit' to end the conversation.\n");
 
-	const nextState = await app.invoke({
-		messages: [...finalState.messages, new HumanMessage("what are the chances of rain for that match")],
-	});
+	while (true) {
+		const input = readlineSync.question("> You: ");
+		if (input.trim().toLowerCase() === "exit") break;
 
-	console.log(nextState.messages[nextState.messages.length - 1].content);
+		messages.push(new HumanMessage(input));
+		const state = await app.invoke({ messages });
+		messages = state.messages;
+
+		const lastMessage = messages[messages.length - 1] as AIMessage;
+		console.log(`AI: ${lastMessage.content}\n`);
+	}
 }
 
 agent().catch(console.error);
